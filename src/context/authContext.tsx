@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Define the API base URL
-const API_BASE_URL = 'http://localhost:5000'; // Change this to your actual backend URL
+const API_BASE_URL = 'https://pmdb-cpl3.onrender.com'; // Change this to your actual backend URL
 
 interface User {
   id: string;

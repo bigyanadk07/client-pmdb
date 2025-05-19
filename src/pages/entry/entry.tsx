@@ -70,7 +70,7 @@ const EntryForm = () => {
     try {
       console.log("Sending payload:", JSON.stringify(payload));
       
-      const response = await fetch('http://localhost:5000/api/videos', {
+      const response = await fetch('https://pmdb-cpl3.onrender.com/api/videos', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

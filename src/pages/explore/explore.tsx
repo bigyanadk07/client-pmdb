@@ -55,7 +55,7 @@ const Explore: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const res = await axios.get('http://localhost:5000/api/videos')
+      const res = await axios.get('https://pmdb-cpl3.onrender.com/api/videos')
       setData(res.data)
       setLoading(false)
     } catch (error) {
@@ -90,7 +90,7 @@ const Explore: React.FC = () => {
         return
       }
 
-      const response = await axios.delete(`http://localhost:5000/api/videos/${deleteId}`, {
+      const response = await axios.delete(`https://pmdb-cpl3.onrender.com/api/videos/${deleteId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -179,7 +179,7 @@ const Explore: React.FC = () => {
       }
 
       const response = await axios.put(
-        `http://localhost:5000/api/videos/${editId}`, 
+        `https://pmdb-cpl3.onrender.com/api/videos/${editId}`, 
         updatedData,
         {
           headers: {
