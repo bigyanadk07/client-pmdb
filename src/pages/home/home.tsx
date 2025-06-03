@@ -2,7 +2,7 @@ import React from 'react';
 import { Play, Film, Search, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const Home = () => {
+const Home:React.FC = () => {
   return (
     <div className="bg-[#342E37] text-gray-200 min-h-screen">
       <main className="py-12 px-4">

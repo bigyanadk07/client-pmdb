@@ -1,9 +1,24 @@
 // EntryForm.jsx with improved error handling and debugging
 
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 
-const EntryForm = () => {
-  const [formData, setFormData] = useState({
+interface FormData {
+  title: string;
+  videoUrl: string;
+  actress: string;
+  genre: string;
+  rating: string;
+  site: string;
+}
+
+interface ValidationError {
+  param?: string;
+  msg: string;
+  message?: string;
+}
+
+const EntryForm: React.FC = () => {
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     videoUrl: '',
     actress: '',
@@ -12,12 +27,12 @@ const EntryForm = () => {
     site: ''
   });
 
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [activeField, setActiveField] = useState(null);
-  const [detailedError, setDetailedError] = useState(null);
+  const [message, setMessage] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [activeField, setActiveField] = useState<string | null>(null);
+  const [detailedError, setDetailedError] = useState<ValidationError[] | null>(null);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -32,6 +47,7 @@ const EntryForm = () => {
       new URL(formData.videoUrl);
     } catch (e) {
       return "Please enter a valid URL";
+      console.log(e)
     }
     
     return null; // No errors
@@ -79,23 +95,27 @@ const EntryForm = () => {
         body: JSON.stringify(payload)
       });
 
-      // Get the raw response text first
       const rawResponse = await response.text();
       
-      // Try to parse as JSON (might fail if response isn't valid JSON)
-      let data;
+      type ApiResponse = {
+        title?: string;
+        message?: string;
+        errors?: ValidationError[];
+      };
+
+      let data: ApiResponse;
       try {
-        data = JSON.parse(rawResponse);
+        data = JSON.parse(rawResponse) as ApiResponse;
       } catch (e) {
         console.error("Failed to parse response as JSON:", rawResponse);
         throw new Error("Server returned an invalid response format");
+        console.log(e)
       }
       
       if (!response.ok) {
-        // Extract detailed error information
         if (data.errors && Array.isArray(data.errors)) {
-          setDetailedError(data.errors);
-          throw new Error(data.errors.map(err => err.msg || err.message).join(', '));
+          setDetailedError(data.errors as ValidationError[]);
+          throw new Error(data.errors.map((err: ValidationError) => err.msg || err.message).join(', '));
         } else {
           throw new Error(data.message || 'Something went wrong');
         }
@@ -113,13 +133,13 @@ const EntryForm = () => {
         site: ''
       });
     } catch (err) {
-      setMessage(`Error: ${err.message || 'Something went wrong.'}`);
+      setMessage(`Error: ${typeof err === 'object' && err !== null && 'message' in err ? (err as { message?: string }).message : 'Something went wrong.'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFocus = (field) => {
+  const handleFocus = (field: string) => {
     setActiveField(field);
   };
 
@@ -127,7 +147,7 @@ const EntryForm = () => {
     setActiveField(null);
   };
 
-  const getFieldClass = (field) => {
+  const getFieldClass = (field: string): string => {
     return `relative border-b ${activeField === field 
       ? 'border-blue-500' 
       : 'border-gray-200'} transition-all duration-300`;

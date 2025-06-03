@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 
 interface Video {
   _id: string;
@@ -26,6 +26,10 @@ interface EditFormData {
   genre: string;    // We'll convert to array before submitting
   rating: number;
   site: string;
+}
+
+interface ErrorResponse {
+  message?: string;
 }
 
 const Explore: React.FC = () => {
@@ -55,7 +59,7 @@ const Explore: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const res = await axios.get('https://pmdb-cpl3.onrender.com/api/videos')
+      const res = await axios.get<ApiResponse>('https://pmdb-cpl3.onrender.com/api/videos')
       setData(res.data)
       setLoading(false)
     } catch (error) {
@@ -90,7 +94,7 @@ const Explore: React.FC = () => {
         return
       }
 
-      const response = await axios.delete(`https://pmdb-cpl3.onrender.com/api/videos/${deleteId}`, {
+      await axios.delete(`https://pmdb-cpl3.onrender.com/api/videos/${deleteId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -109,18 +113,20 @@ const Explore: React.FC = () => {
       setShowConfirmation(false)
       setDeleteId(null)
       setDeleteLoading(false)
-    } catch (error: any) {
-      console.error('Error deleting video:', error);
+    } catch (err) {
+      console.error('Error deleting video:', err);
       
-      if (error.response) {
+      const axiosError = err as AxiosError<ErrorResponse>
+      
+      if (axiosError.response) {
         setDeleteError(
-          error.response.data?.message || 
-          `Server error (${error.response.status}): ${error.response.statusText}`
+          axiosError.response.data?.message || 
+          `Server error (${axiosError.response.status}): ${axiosError.response.statusText}`
         );
-      } else if (error.request) {
+      } else if (axiosError.request) {
         setDeleteError('Server did not respond to delete request');
       } else {
-        setDeleteError(`Error: ${error.message}`);
+        setDeleteError(`Error: ${axiosError.message}`);
       }
       
       setDeleteLoading(false)
@@ -151,7 +157,7 @@ const Explore: React.FC = () => {
     const { name, value } = e.target
     setEditFormData(prev => ({
       ...prev,
-      [name]: name === 'rating' ? parseInt(value) : value
+      [name]: name === 'rating' ? parseInt(value, 10) : value
     }))
   }
 
@@ -174,11 +180,11 @@ const Explore: React.FC = () => {
       // Convert comma-separated strings to arrays
       const updatedData = {
         ...editFormData,
-        actress: editFormData.actress.split(',').map(item => item.trim()),
-        genre: editFormData.genre.split(',').map(item => item.trim())
+        actress: editFormData.actress.split(',').map(item => item.trim()).filter(item => item.length > 0),
+        genre: editFormData.genre.split(',').map(item => item.trim()).filter(item => item.length > 0)
       }
 
-      const response = await axios.put(
+      const response = await axios.put<Video>(
         `https://pmdb-cpl3.onrender.com/api/videos/${editId}`, 
         updatedData,
         {
@@ -202,18 +208,20 @@ const Explore: React.FC = () => {
       setShowEditModal(false)
       setEditId(null)
       setEditLoading(false)
-    } catch (error: any) {
-      console.error('Error updating video:', error);
+    } catch (err) {
+      console.error('Error updating video:', err);
       
-      if (error.response) {
+      const axiosError = err as AxiosError<ErrorResponse>
+      
+      if (axiosError.response) {
         setEditError(
-          error.response.data?.message || 
-          `Server error (${error.response.status}): ${error.response.statusText}`
+          axiosError.response.data?.message || 
+          `Server error (${axiosError.response.status}): ${axiosError.response.statusText}`
         );
-      } else if (error.request) {
+      } else if (axiosError.request) {
         setEditError('Server did not respond to update request');
       } else {
-        setEditError(`Error: ${error.message}`);
+        setEditError(`Error: ${axiosError.message}`);
       }
       
       setEditLoading(false)
@@ -227,7 +235,7 @@ const Explore: React.FC = () => {
   }
 
   // Check if user is logged in
-  const isUserLoggedIn = () => {
+  const isUserLoggedIn = (): boolean => {
     return !!localStorage.getItem('token');
   }
 
@@ -237,243 +245,253 @@ const Explore: React.FC = () => {
 
   return (
     <div className='bg-[#342E37] text-white'>
-          <div className="container mx-auto p-6 min-h-screen">
-      <h1 className="text-2xl font-medium mb-8 text-center text-white">Videos</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {data.videos.length > 0 ? (
-          data.videos.map((video) => (
-            <div key={video._id} className="border border-gray-600 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
-              <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="block">
-                <div className="h-48 w-full bg-gray-200">
-                  <img
-                    alt={video.title}
-                    src="https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                
-                <div className="p-5">
-                  <h3 className="text-lg font-medium text-white line-clamp-1">{video.title}</h3>
-                  
-                  <div className="mt-2 flex items-center text-sm">
-                    <span className="flex items-center text-yellow-500 font-medium">
-                      {video.rating}/10
-                    </span>
-                    <span className="mx-2 text-gray-300">•</span>
-                    <span className="text-gray-300">{video.site}</span>
+      <div className="container mx-auto p-6 min-h-screen">
+        <h1 className="text-2xl font-medium mb-8 text-center text-white">Videos</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {data.videos.length > 0 ? (
+            data.videos.map((video) => (
+              <div key={video._id} className="border border-gray-600 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <a href={video.videoUrl} target="_blank" rel="noopener noreferrer" className="block">
+                  <div className="h-48 w-full bg-gray-200">
+                    <img
+                      alt={video.title}
+                      src="https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   
-                  <p className="mt-2 text-gray-400 text-sm">
-                    {Array.isArray(video.genre) ? video.genre.join(', ') : video.genre}
-                  </p>
-                  
-                  <p className="mt-1 text-xs text-gray-200">
-                    Actress: {video.actress.join(', ')}
-                  </p>
-                  
-                  <p className="mt-1 text-xs text-gray-200">
-                    Added: {new Date(video.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </a>
-              
-              <div className="px-5 pb-5 flex space-x-2">
-                <a 
-                  href={video.videoUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-blue-500 text-white text-center py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors"
-                >
-                  Watch
+                  <div className="p-5">
+                    <h3 className="text-lg font-medium text-white line-clamp-1">{video.title}</h3>
+                    
+                    <div className="mt-2 flex items-center text-sm">
+                      <span className="flex items-center text-yellow-500 font-medium">
+                        {video.rating}/10
+                      </span>
+                      <span className="mx-2 text-gray-300">•</span>
+                      <span className="text-gray-300">{video.site}</span>
+                    </div>
+                    
+                    <p className="mt-2 text-gray-400 text-sm">
+                      {Array.isArray(video.genre) ? video.genre.join(', ') : video.genre}
+                    </p>
+                    
+                    <p className="mt-1 text-xs text-gray-200">
+                      Actress: {Array.isArray(video.actress) ? video.actress.join(', ') : video.actress}
+                    </p>
+                    
+                    <p className="mt-1 text-xs text-gray-200">
+                      Added: {new Date(video.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
                 </a>
-                {isUserLoggedIn() && (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleDeleteClick(video._id)}
-                      className="w-10 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
-                      aria-label="Delete"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                
+                <div className="px-5 pb-5 flex space-x-2">
+                  <a 
+                    href={video.videoUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-blue-500 text-white text-center py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors"
+                  >
+                    Watch
+                  </a>
+                  {isUserLoggedIn() && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEditClick(video)}
+                        className="w-10 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                        aria-label="Edit"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(video._id)}
+                        className="w-10 h-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                        aria-label="Delete"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
-        ) : (
-          <p className="col-span-3 text-center text-gray-500">No videos available</p>
-        )}
-      </div>
-      
-      <div className="mt-8 mb-4 text-center text-sm text-gray-500">
-        <p>Page {data.currentPage} of {data.totalPages} • Total videos: {data.totalVideos}</p>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-lg max-w-md w-full animate-fade-in">
-            <h2 className="text-xl font-medium mb-3 text-white">Confirm Deletion</h2>
-            <p className="mb-6 text-gray-600">Are you sure you want to delete this video? This action cannot be undone.</p>
-            
-            {deleteError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-                {deleteError}
-              </div>
-            )}
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
-                disabled={deleteLoading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-6 py-2 bg-red-500 text-white rounded-full font-medium hover:bg-red-600 transition-colors"
-                disabled={deleteLoading}
-              >
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
+            ))
+          ) : (
+            <p className="col-span-3 text-center text-gray-500">No videos available</p>
+          )}
         </div>
-      )}
+        
+        <div className="mt-8 mb-4 text-center text-sm text-gray-500">
+          <p>Page {data.currentPage} of {data.totalPages} • Total videos: {data.totalVideos}</p>
+        </div>
 
-      {/* Edit Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-lg max-w-lg w-full animate-fade-in">
-            <h2 className="text-xl font-medium mb-4 text-white">Edit Video</h2>
-            
-            {editError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-                {editError}
-              </div>
-            )}
-            
-            <form onSubmit={submitEdit} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="title">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={editFormData.title}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+        {/* Delete Confirmation Modal */}
+        {showConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-lg max-w-md w-full">
+              <h2 className="text-xl font-medium mb-3 text-gray-900">Confirm Deletion</h2>
+              <p className="mb-6 text-gray-600">Are you sure you want to delete this video? This action cannot be undone.</p>
               
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="videoUrl">
-                  Video URL
-                </label>
-                <input
-                  type="url"
-                  id="videoUrl"
-                  name="videoUrl"
-                  value={editFormData.videoUrl}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+              {deleteError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {deleteError}
+                </div>
+              )}
               
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="actress">
-                  Actress (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  id="actress"
-                  name="actress"
-                  value={editFormData.actress}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="genre">
-                  Genre (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  id="genre"
-                  name="genre"
-                  value={editFormData.genre}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="rating">
-                  Rating (1-10)
-                </label>
-                <select
-                  id="rating"
-                  name="rating"
-                  value={editFormData.rating}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                    <option key={num} value={num}>{num}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="site">
-                  Site
-                </label>
-                <input
-                  type="text"
-                  id="site"
-                  name="site"
-                  value={editFormData.site}
-                  onChange={handleEditInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-3 pt-2">
+              <div className="flex justify-end space-x-3">
                 <button
-                  type="button"
-                  onClick={cancelEdit}
+                  onClick={cancelDelete}
                   className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
-                  disabled={editLoading}
+                  disabled={deleteLoading}
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-500 text-white rounded-full font-medium hover:bg-blue-600 transition-colors"
-                  disabled={editLoading}
+                  onClick={confirmDelete}
+                  className="px-6 py-2 bg-red-500 text-white rounded-full font-medium hover:bg-red-600 transition-colors"
+                  disabled={deleteLoading}
                 >
-                  {editLoading ? "Updating..." : "Save Changes"}
+                  {deleteLoading ? "Deleting..." : "Delete"}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-medium mb-4 text-gray-900">Edit Video</h2>
+              
+              {editError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {editError}
+                </div>
+              )}
+              
+              <form onSubmit={submitEdit} className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="title">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value={editFormData.title}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="videoUrl">
+                    Video URL
+                  </label>
+                  <input
+                    type="url"
+                    id="videoUrl"
+                    name="videoUrl"
+                    value={editFormData.videoUrl}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="actress">
+                    Actress (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    id="actress"
+                    name="actress"
+                    value={editFormData.actress}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="genre">
+                    Genre (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    id="genre"
+                    name="genre"
+                    value={editFormData.genre}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="rating">
+                    Rating (1-10)
+                  </label>
+                  <select
+                    id="rating"
+                    name="rating"
+                    value={editFormData.rating}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                      <option key={num} value={num}>{num}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="site">
+                    Site
+                  </label>
+                  <input
+                    type="text"
+                    id="site"
+                    name="site"
+                    value={editFormData.site}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    required
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
+                    disabled={editLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-blue-500 text-white rounded-full font-medium hover:bg-blue-600 transition-colors"
+                    disabled={editLoading}
+                  >
+                    {editLoading ? "Updating..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
